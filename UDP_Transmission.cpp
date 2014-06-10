@@ -10,8 +10,12 @@
 #include <signal.h>
 #include <iostream>
 
+#define MAX_RECV_LENGTH  1024
+#define MAX_SEND_LENGTH  1024
+
 //Two-Way communication only
 struct sockaddr_in me_addr, other_addr;
+char recv_data[MAX_RECV_LENGTH], send_data[MAX_SEND_LENGTH];
 
 /*
    Initializes a socket with given id and returns the socketID
@@ -64,7 +68,35 @@ int clientInit(int type, int portno, char* IPaddr){
 
 }
 /*
+   Wrapper for sendto function. 
+   Inputs:
+      sockid = SockID
+      buffer = Array with intended message
+      buflen = max length of buffer
+*/
+void Send(int sockid, char* buffer, int buflen){
    
+   sendto(sockid, buffer, buflen, 0, 
+         (struct sockaddr *)&other_addr, sizeof(struct sockaddr));
+
+} 
+/*
+   Wrapper for recvfrom function
+   Inputs:
+      sockid = SockID
+      buffer = array to store received data
+      buflen = max length of buffer
+   Output:
+      Returns number of bits received
+*/
+int Receive(int sockid, char* buffer, int buflen){
+   
+   return recvfrom(sock, buffer, buflen, 0,
+                  (struct sockaddr *)&other_addr, sizeof(struct sockaddr));
+
+}
+/*
+   Begins communication session between two computers   
 */
 int communicationInit(char* IPaddr, int portnumber){
    int sock, quit;
@@ -92,6 +124,7 @@ int communicationInit(char* IPaddr, int portnumber){
       while(1){
          if(pID == 0){
             //sendto wrapper
+            Send(sock, send_data, strlen(send_data));
          }
          //Throw exception if forking failed.
          else if(pID < 0){
@@ -101,7 +134,8 @@ int communicationInit(char* IPaddr, int portnumber){
             exit(1);
          }
          else{
-            //recvfrom wrapper
+            //recvto wrapper
+            Receive(sock, recv_data, MAX_RECV_LENGTH);
          }
    
       }
