@@ -16,12 +16,15 @@
 //Two-Way communication only
 struct sockaddr_in me_addr, other_addr;
 char recv_data[MAX_RECV_LENGTH], send_data[MAX_SEND_LENGTH];
+int pipein[2], pipeout[2];
+int sock;
 
 /*
    Initializes a socket with given id and returns the socketID
    as an integer. 
    Inputs:
-      type = 
+      type t
+exi 
       domain = message type i.e. SOCK_DGRAM, SOCK_STREAM
       protocol = 0 for UDP
    Output:
@@ -67,6 +70,7 @@ int clientInit(int type, int portno, char* IPaddr){
    bzero(&(other_addr.sin_zero),8);
 
 }
+
 /*
    Wrapper for sendto function. 
    Inputs:
@@ -95,12 +99,43 @@ int Receive(int sockid, char* buffer, int buflen){
                   (struct sockaddr *)&other_addr, sizeof(struct sockaddr));
 
 }
+
+/*
+   Takes User message and passes it onto the queue so that it is sent as   soon as possible.
+   
+   Inputs:
+      message = Null terminated string
+*/
+
+void userWrite(char* message){
+   //Close read pipe, open write pipe, write to pipe, close write pipe
+   close(pipeout[0]);
+   open(pipeout[1]);
+   write(pipeout[1], message, strlen(message));
+   close(pipeout[1]);   
+}
+
+/*
+   Takes data from queue and returns it to User
+*/
+
+char* userRead(void){
+   char* buffer[MAX_RECV_LENGTH];
+
+   close(pipein[1]);
+   open(pipein[0]);
+   read(pipein[0], &buffer, 0);
+   close(pipein[0]);
+   
+   return buffer;
+}
 /*
    Begins communication session between two computers   
 */
 int communicationInit(char* IPaddr, int portnumber){
-   int sock, quit;
+   int recv_length;
 
+   //Initialize sock
    sock = socketInit(sock, AF_INET, SOCK_DGRAM, 0, portnumber);
 
    //Initialze Destination
@@ -114,6 +149,12 @@ int communicationInit(char* IPaddr, int portnumber){
       perror("Unable to Bind");
       exit(1);
    }
+      
+   //Create Pipe Buffers for Send and Receive
+   if(pipe(pipein) == -1 || pipe(pipeout) == -1){
+      perror("Pipe");
+      exit(1);
+   }
 
    while(1){
       //Fork process to allow for sending and receiving at the same time.
@@ -123,6 +164,11 @@ int communicationInit(char* IPaddr, int portnumber){
       //Loop for reading from destination, writing to destination
       while(1){
          if(pID == 0){
+            //Child uses Output Pipe to send to destination
+            close(pipeout[1]);
+            open(pipeout[0]);
+            read(pipeout[0], &send_data, 0);
+            close(pipeout[0]);
             //sendto wrapper
             Send(sock, send_data, strlen(send_data));
          }
@@ -135,7 +181,14 @@ int communicationInit(char* IPaddr, int portnumber){
          }
          else{
             //recvto wrapper
-            Receive(sock, recv_data, MAX_RECV_LENGTH);
+            recv_length = Receive(sock, recv_data, MAX_RECV_LENGTH);
+            recv_data[recv_length] = '\0';
+            //Parent uses Input Pipe to send received data to user
+            close(pipein[0]);
+            open(pipein[1]);
+            write(pipein[1], &recv_data, 0);
+            close(pipein[1]);
+
          }
    
       }
