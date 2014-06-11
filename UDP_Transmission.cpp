@@ -105,11 +105,7 @@ int Receive(int sockid, char* buffer, int buflen){
 */
 
 void userWrite(char* message){
-   //Close read pipe, open write pipe, write to pipe, close write pipe
-   close(pipeout[0]);
-   open(pipeout[1]);
-   write(pipeout[1], message, strlen(message));
-   close(pipeout[1]);   
+   //WRITE TO INFIFO FROM USER
 }
 
 /*
@@ -119,11 +115,8 @@ void userWrite(char* message){
 char* userRead(void){
    char* buffer[MAX_RECV_LENGTH];
 
-   close(pipein[1]);
-   open(pipein[0]);
-   read(pipein[0], &buffer, 0);
-   close(pipein[0]);
-   
+   //READ FROM OUTFIFO AND PASS TO USER  
+ 
    return buffer;
 }
 /*
@@ -162,10 +155,9 @@ void communicationInit(char* IPaddr, int portnumber){
       while(1){
          if(pID == 0){
             //Child uses Output Pipe to send to destination
-            close(pipeout[1]);
-            open(pipeout[0]);
-            read(pipeout[0], &send_data, 0);
-            close(pipeout[0]);
+            
+            //READ FROM INFIFO FROM USER
+            
             //sendto wrapper
             Send(sock, send_data, strlen(send_data));
          }
@@ -181,11 +173,8 @@ void communicationInit(char* IPaddr, int portnumber){
             recv_length = Receive(sock, recv_data, MAX_RECV_LENGTH);
             recv_data[recv_length] = '\0';
             //Parent uses Input Pipe to send received data to user
-            close(pipein[0]);
-            open(pipein[1]);
-            write(pipein[1], &recv_data, 0);
-            close(pipein[1]);
-
+               
+            //WRITE TO OUTFIFO FOR USER
          }
    
       }
