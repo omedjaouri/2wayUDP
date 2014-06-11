@@ -57,18 +57,15 @@ int socketInit(int sockfd, int type, int domain, int protocol,
       type = 
       portno = Port Number of destination
       IPaddr = IP address
-   Output:
-      1 = All Good
-      -1 = Error   
 */
 
-int clientInit(int type, int portno, char* IPaddr){
+void clientInit(int type, int portno, char* IPaddr){
    
    other_addr.sinfamily = type;
    other_addr.sin_port = htons(portno);
    inet_pton(type, IPaddr, &(other_addr.sin_addr));
    bzero(&(other_addr.sin_zero),8);
-
+   
 }
 
 /*
@@ -132,7 +129,7 @@ char* userRead(void){
 /*
    Begins communication session between two computers   
 */
-int communicationInit(char* IPaddr, int portnumber){
+void communicationInit(char* IPaddr, int portnumber){
    int recv_length;
 
    //Initialize sock
