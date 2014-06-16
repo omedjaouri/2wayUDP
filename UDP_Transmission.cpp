@@ -1,5 +1,6 @@
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/wait.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -238,6 +239,7 @@ void communicationInit(char* IPaddr, int dest_portnumber,
             printf("Ticks: %d\n", ticks);
             if(ticks == time){
                kill(pID, SIGTERM);
+               waitpid(pID, NULL, 0);
                exit(1);
             }
             //recvto wrapper
