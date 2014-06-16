@@ -214,11 +214,6 @@ void communicationInit(char* IPaddr, int dest_portnumber,
             //read message and shift
                if(inbuffer[k] != 0){
                   queue_get(&inqueue, send_data, inbuffer[k]);
-                  if(send_data[0] == 'q'){
-                     ppID= getppid();
-                     kill(ppID, SIGTERM);
-                     exit(1);
-                  }
                   inbuffer[k] = 0;
                   array_shift(inbuffer, (k+1), (k+1));
                   k = MAX_MESSAGES;
