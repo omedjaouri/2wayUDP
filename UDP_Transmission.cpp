@@ -169,9 +169,11 @@ bool userRead(char* buffer){
 /*
    Begins communication session between two computers   
 */
-void communicationInit(char* IPaddr, int dest_portnumber, int portno){
-   int recv_length, k, j;
-
+void communicationInit(char* IPaddr, int dest_portnumber, 
+                       int portno, int time){
+   
+   int recv_length, k, j, ticks;
+   ticks = 0;
 
    //Initialize queues
    if(!queue_init(&inqueue, MAX_BUFFER_LENGTH) || 
@@ -237,6 +239,12 @@ void communicationInit(char* IPaddr, int dest_portnumber, int portno){
          }
          else{
             j = 0;
+            ticks = ticks + 1;
+            printf("Ticks: %d\n", ticks);
+            if(ticks == time){
+               kill(pID, SIGTERM);
+               exit(1);
+            }
             //recvto wrapper
             recv_length = Receive(sock, recv_data, MAX_RECV_LENGTH);
             recv_data[recv_length] = '\0';
@@ -250,8 +258,7 @@ void communicationInit(char* IPaddr, int dest_portnumber, int portno){
                   j = MAX_MESSAGES;
                }
                j++;
-            }
-            
+            } 
          }
    
       }

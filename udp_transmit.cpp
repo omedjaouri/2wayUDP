@@ -16,10 +16,10 @@ int main(){
    
    pid_t pID = fork();
    if(pID == 0){
-      communicationInit("127.0.0.1", portno_other, portno);
+      communicationInit("127.0.0.1", portno_other, portno, 10);
    }
    else{
-   printf("Transmit: ");
+   printf("Transmit: \n");
    scanf("%s", message);
    if(!(userWrite(message))){
       exit(1);
@@ -27,7 +27,7 @@ int main(){
    if(!(userRead(receive))){
       exit(1);
    }
-   printf("Received: %s", receive);
+   printf("Received: %s\n", receive);
    }
    return 0;
 }

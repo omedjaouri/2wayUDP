@@ -118,6 +118,7 @@ bool userRead(char* buffer);
       char* IPaddr = IP address of the destination
       int portnumber = Port number of the destination
 */
-void communicationInit(char* IPaddr, int dest_portnumber, int portno);
+void communicationInit(char* IPaddr, int dest_portnumber, 
+                       int portno, int ticks);
 
 #endif
