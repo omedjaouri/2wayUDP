@@ -11,15 +11,24 @@
 #include <arpa/inet.h>
 #include <signal.h>
 #include <iostream>
+#include "_fifo_queue.h"
 
-#define MAX_RECV_LENGTH 1024
-#define MAX_SEND_LENGTH 1024
+#define MAX_RECV_LENGTH 512
+#define MAX_SEND_LENGTH 512
+#define MAX_BUFFER_LENGTH 4086
+#define MAX_MESSAGES 8
 
-struct sockaddr_in me_addr other_addr;
-char recv_data[MAX_RECV_LENGTH], send_data[MAX_SEND_LENGTH]
-int pipein[2], pipeout[2];
-int sock;
-
+extern struct sockaddr_in me_addr, other_addr;
+extern char recv_data[MAX_RECV_LENGTH], send_data[MAX_SEND_LENGTH];
+extern int inbuffer[MAX_MESSAGES], outbuffer[MAX_MESSAGES];
+extern int sock;
+extern struct _queue* inqueue, outqueue;
+/*
+   ** FOR USE BY LIBRARY, DOES NOT NEED TO BE CALLED DIRECTLY **
+   
+   Shifts array left a given amount of steps.
+*/
+void array_shift(int* array, int shift, int init_val);
 /*
   ** FOR USE BY LIBRARY, DOES NOT NEED TO BE CALLED DIRECTLY **
 
@@ -85,7 +94,7 @@ int Receive(int sockid, char* buffer, int buflen);
    Inputs:
       char* message = Null terminated string
 */
-void userWrite(char* message);      
+bool userWrite(char* message);      
 
 /*
    Takes data from the queue and returns it to the User
@@ -94,7 +103,7 @@ void userWrite(char* message);
    Outputs: 
       Returns buffer for use by the user
 */
-char* userRead(void);
+bool userRead(char* buffer);
 
 /*
    Initializes the communication. Creates two separate processes,
@@ -109,6 +118,6 @@ char* userRead(void);
       char* IPaddr = IP address of the destination
       int portnumber = Port number of the destination
 */
-void communicationInit(char* IPaddr, int portnumber);
+void communicationInit(char* IPaddr, int dest_portnumber, int portno);
 
 #endif
