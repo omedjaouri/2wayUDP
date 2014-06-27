@@ -102,9 +102,9 @@ bool userWrite(char* message);
    
    
    Outputs: 
-      Returns buffer for use by the user
+      Returns size of message for use by the user
 */
-bool userRead(char* buffer);
+int userRead(char* buffer);
 
 /*
    Initializes the communication. Creates two separate processes,

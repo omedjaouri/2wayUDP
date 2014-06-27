@@ -12,16 +12,17 @@
 #include <iostream>
 #include "_fifo_queue.h"
 
-#define MAX_RECV_LENGTH  512
+#define MAX_RECV_LENGTH  513
 #define MAX_SEND_LENGTH  512
 //Buffer length must be multiple of recv/send buffer
-#define MAX_BUFFER_LENGTH 4086
+#define MAX_BUFFER_LENGTH 10000
 #define MAX_MESSAGES 8
 
 //Two-Way communication only
 struct sockaddr_in me_addr, other_addr;
 char recv_data[MAX_RECV_LENGTH], send_data[MAX_SEND_LENGTH];
-int inbuffer[MAX_MESSAGES], outbuffer[MAX_MESSAGES];
+int inbuffer[MAX_MESSAGES] = {0};
+int outbuffer[MAX_MESSAGES] = {0};
 int sock;
 struct _queue inqueue, outqueue;
 
@@ -127,45 +128,63 @@ int Receive(int sockid, char* buffer, int buflen){
 */
 
 bool userWrite(char* message){
-   int k;
+   int k, space, slength;
    k = 0;
+   space = queue_space(&inqueue, QUEUE_SPACE_PUT);
+   printf("Available space: %d\n", space);
+   //+1 to deal with the null terminator at the end
+   slength = strlen(message)+1;
+   if(slength < 1)
+      return false;
+   printf("Message Length: %d\n", slength);
+   if(space >= slength){
    //WRITE TO INFIFO FROM USER
-   while(k<MAX_MESSAGES){
+      while(k<MAX_MESSAGES){
       
-      if(inbuffer[k] == 0){
-         inbuffer[k] = strlen(message);
-         queue_put(&inqueue, message, inbuffer[k]);
-         return true;
+         if(inbuffer[k] == 0){
+            inbuffer[k] = slength;
+            queue_put(&inqueue, message, slength);
+            return true;
+         }
+         k++;
       }
-      k++;
+      return false;
    }
-   return false;
+   else{
+      //flush queue
+      queue_flush(&inqueue);
+      printf("FIFO Full, Please Resend\n");
+      return false;
+   }
 }
 
 /*
    Takes data from queue and returns it to User
    
    Outputs:
-      Returns buffer containing latest message. 
+      Returns size of buffer. 
       Returns NULL if receive queue is empty
 */
 
-bool userRead(char* buffer){
-   int k, j;
+int userRead(char* buffer){
+   int k, rlength, space;
    k = 0;
-   //READ FROM OUTFIFO AND PASS TO USER  
-   while(k<MAX_MESSAGES){
-      //If nonzero message length in the buffer, read message and shift
-      if(outbuffer[k] != 0){
-         j = outbuffer[k];
-         queue_get(&outqueue, buffer, outbuffer[k]);  
-         array_shift(outbuffer, (k+1), (k+1));
-         buffer[j] = '\0';
-         return true;
+   space = queue_space(&outqueue, QUEUE_SPACE_GET);
+   //IF Queue is empty, return false;
+   if(space != MAX_BUFFER_LENGTH){ 
+      //READ FROM OUTFIFO AND PASS TO USER  
+      while(k<MAX_MESSAGES){
+        if(outbuffer[k] != 0){
+           rlength = outbuffer[k];
+           queue_get(&outqueue, buffer, rlength);  
+           array_shift(outbuffer, (k+1), (k+1));
+           return rlength;
+        }
+        k++;
       }
-      k++;
    }
-   return false;
+   else
+      return 0;    
 }
 /*
    Begins communication session between two computers   
@@ -173,7 +192,7 @@ bool userRead(char* buffer){
 void communicationInit(char* IPaddr, int dest_portnumber, 
                        int portno, int time){
    
-   int recv_length, k, j, ticks;
+   int recv_length, k, j, ticks, rlength, slength, space;
    ticks = 0;
 
    //Initialize queues
@@ -182,8 +201,11 @@ void communicationInit(char* IPaddr, int dest_portnumber,
       perror("Queue");
       exit(1);
    }
-   
-
+   space = queue_space(&inqueue, QUEUE_SPACE_PUT);
+   printf("Init space available in inqueue: %d\n", space);
+   space = queue_space(&outqueue, QUEUE_SPACE_PUT);
+   printf("Init space available in outqueue: %d\n",space);   
+   space = 0;
    //Initialize sock
    sock = socketInit(sock, AF_INET, SOCK_DGRAM, 0, portno);
 
@@ -210,21 +232,27 @@ void communicationInit(char* IPaddr, int dest_portnumber,
          if(pID == 0){
             //Child uses inqueue to send to destination
             int k = 0;
-            while(k<MAX_MESSAGES){
-            //If nonzero message length in the buffer, 
-            //read message and shift
-               if(inbuffer[k] != 0){
-                  queue_get(&inqueue, send_data, inbuffer[k]);
-                  inbuffer[k] = 0;
-                  array_shift(inbuffer, (k+1), (k+1));
-                  k = MAX_MESSAGES;
-                  }
-               k++;
-            }
-            //READ FROM INFIFO FROM USER
+            int gspace = queue_space(&inqueue, QUEUE_SPACE_GET);
+            //space = queue_space(&inqueue, QUEUE_SPACE_PUT);
             
-            //sendto wrapper
-            Send(sock, send_data, strlen(send_data));
+            //printf("Available space: %d\n", space);
+            if(gspace > 0){
+               while(k<MAX_MESSAGES){
+               //If nonzero message length in the buffer, 
+               //read message and shift
+                  if(inbuffer[k] != 0){
+                     queue_get(&inqueue, send_data, inbuffer[k]);
+                     inbuffer[k] = 0;
+                     array_shift(inbuffer, (k+1), (k+1));
+                     k = MAX_MESSAGES;
+                     }
+                  k++;
+               }
+               //READ FROM INFIFO FROM USER
+            
+               //sendto wrapper
+               Send(sock, send_data, strlen(send_data));
+            }
          }
          //Throw exception if forking failed.
          else if(pID < 0){
@@ -234,10 +262,12 @@ void communicationInit(char* IPaddr, int dest_portnumber,
             exit(1);
          }
          else{
+            int putspace, plength;
             j = 0;
             ticks = ticks + 1;
-            printf("Ticks: %d\n", ticks);
+            //printf("Ticks: %d\n", ticks);
             if(ticks == time){
+               printf("Transmission Ended\n");
                kill(pID, SIGTERM);
                waitpid(pID, NULL, 0);
                exit(1);
@@ -246,7 +276,9 @@ void communicationInit(char* IPaddr, int dest_portnumber,
             recv_length = Receive(sock, recv_data, MAX_RECV_LENGTH);
             recv_data[recv_length] = '\0';
             //Parent uses outqueue to send received data to user
-           
+            putspace = queue_space(&outqueue, QUEUE_SPACE_PUT);
+            plength = strlen(recv_data)+1;
+            if(putspace >= plength){
              while(j<MAX_MESSAGES){
                
                if(outbuffer[j] == 0){
@@ -255,7 +287,12 @@ void communicationInit(char* IPaddr, int dest_portnumber,
                   j = MAX_MESSAGES;
                }
                j++;
-            } 
+             } 
+            }
+            else{
+               printf("Receive queue full, flushing queue\n");
+               queue_flush(&outqueue);
+            }
          }
    
       }
