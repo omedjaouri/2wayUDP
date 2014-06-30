@@ -138,7 +138,7 @@ void (*Receive)(){
    other tasks without having to worry about waiting for sendto
 
 */
-void userWrite(char* message){
+int userWrite(char* message){
    int pspace = queue_space(&outqueue, QUEUE_SPACE_PUT);
    int size = strlen(message)+1;
    int j = 0;
@@ -151,10 +151,12 @@ void userWrite(char* message){
          }
          j++;
       }
+      return size;
    }
    else{
       printf("Send Queue Full, flushing queue, please resend\n");
       queue_flush(&outqueue);
+      return -1;
    }
 }
 

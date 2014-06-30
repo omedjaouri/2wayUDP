@@ -108,9 +108,11 @@ void (*Receive)(void);
 
    Inputs:
       char* message =  the message to put on queue
+   Outputs:
+      Returns number of bytes put on queue or -1 if the queue was full
 
 */
-void userWrite(char* message);
+int userWrite(char* message);
 
 /*
 
