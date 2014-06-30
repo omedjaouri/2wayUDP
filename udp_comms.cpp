@@ -10,13 +10,23 @@
 #include <signal.h>
 #include <iostream>
 #include <pthread.h>
-#include <_fifo_queue.h>
+#include "_fifo_queue.h"
+#include "udp_comms.h"
+#include "strings.h"
+#include "string.h"
 
 #define MAX_RECV_LENGTH 512
 #define MAX_SEND_LENGTH 512
 #define MAX_BUFFER_LENGTH 4086
 #define MAX_MESSAGES 8
 
+struct sockaddr_in server_addr, client_addr;
+int inbuffer[MAX_MESSAGES] = {0};
+int outbuffer[MAX_MESSAGES] = {0};
+char send_buffer[MAX_SEND_LENGTH] = {0};
+char recv_buffer[MAX_RECV_LENGTH] = {0};
+struct _queue inqueue, outqueue;
+int sock;
 
 //Shift an array using user provided parameters for intial position
 //in array as well as the amount to shift by.
@@ -57,7 +67,6 @@ void clientInit(int type, int portno, char* IPaddr){
    client_addr.sin_port = htons(portno);
    inet_pton(type, IPaddr, &(client_addr.sin_addr));
    bzero(&(client_addr.sin_zero),8);
-   return;
 }
 
 /*
@@ -69,7 +78,7 @@ void clientInit(int type, int portno, char* IPaddr){
    track of how large each messages is.
 
 */
-void (*Send)(){
+void *Send(void* ptr){
    int k, gspace, size;
    while(1){
       k = 0;
@@ -101,10 +110,10 @@ void (*Send)(){
    and keeps track of the length of the message using inbuffer.
 
 */
-void (*Receive)(){
-   int pspace, plength, bytes;
+void *Receive(void* ptr){
+   int pspace, plength, bytes, j;
    while(1){
-       
+      j =0;
       bytes = recvfrom(sock, recv_buffer, MAX_RECV_LENGTH, 0,
                       (struct sockaddr*)&server_addr,(socklen_t*) 
                       sizeof(struct sockaddr));
@@ -192,6 +201,7 @@ int userRead(char* buffer){
 void commInit(char* IPaddr, int dest_portnumber, int portno){
    int threadret1, threadret2;
    pthread_t thread1, thread2;
+
    //Initialize queues
    if(!queue_init(&inqueue, MAX_BUFFER_LENGTH) ||
       !queue_init(&outqueue, MAX_BUFFER_LENGTH)){
@@ -211,12 +221,12 @@ void commInit(char* IPaddr, int dest_portnumber, int portno){
    }
    
    //Create threads for Send and Receive
-   threadret1 = pthread_create(&thread1, NULL, Send);
+   threadret1 = pthread_create(&thread1, NULL, Send, NULL);
    if(threadret1){
       perror("Threading failed");
       exit(1);
    }
-   threadret2 = pthread_create(&thread2, NULL, Receive);
+   threadret2 = pthread_create(&thread2, NULL, Receive, NULL);
    if(threadret2){
       perror("Threading failed");
       exit(1);

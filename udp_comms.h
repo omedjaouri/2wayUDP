@@ -8,22 +8,18 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <signal.h>
-#include <iostream.h>
+#include <iostream>
 #include <pthread.h>
-#include <_fifo_queue.h>
+#include "_fifo_queue.h"
+#include "strings.h"
+#include "string.h"
+
 
 #define MAX_RECV_LENGTH 512
 #define MAX_SEND_LENGTH 512
 #define MAX_BUFFER_LENGTH 4086
 #define MAX_MESSAGES 8
 
-struct sockaddr_in server_addr, client_addr;
-int inbuffer[MAX_MESSAGES] = {0};
-int outbuffer[MAX_MESSAGES] = {0};
-char send_buffer[MAX_SEND_LENGTH] = {0};
-char recv_buffer[MAX_RECV_LENGTH] = {0};
-struct _queue inqueue, outqueue;
-int sock;
 
 /*
 
@@ -82,7 +78,7 @@ void clientInit(int type, int portno, char* IPaddr);
    the user processes data.
 
 */
-void (*Send)(void);
+void *Send(void);
 
 /*
 
@@ -95,7 +91,7 @@ void (*Send)(void);
    is.
 
 */
-void (*Receive)(void);
+void *Receive(void);
 
 /*
 
