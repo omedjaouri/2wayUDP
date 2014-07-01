@@ -1,4 +1,4 @@
-#include "UDP_Transmission.h"
+#include "udp_comms.h"
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -13,16 +13,14 @@ int main(){
    printf("Your Port Number: ");
    scanf("%d", &portno);
    
-   pid_t pID = fork();
-   if(pID == 0){
-      communicationInit("127.0.0.1", portno_other, portno, 1000);
-   }
-   else{
-      while(1){
-         bytes = userRead(receive);
-         if(bytes > 0){
-            printf("Received %s\n", receive);
-         }
+   commInit("127.0.0.1", portno_other, portno);
+   
+   while(1){
+      bytes = userRead(receive);
+      //printf("%d\n", bytes);
+      if(bytes > 0){
+         printf("Received %s\n", receive);
       }
    }
 }
+

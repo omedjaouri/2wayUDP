@@ -19,7 +19,7 @@
 #define MAX_RECV_LENGTH 512
 #define MAX_SEND_LENGTH 512
 #define MAX_BUFFER_LENGTH 4086
-#define MAX_MESSAGES 8
+#define MAX_MESSAGES 12
 
 struct sockaddr_in server_addr, client_addr;
 int inbuffer[MAX_MESSAGES] = {0};
@@ -28,8 +28,7 @@ char send_buffer[MAX_SEND_LENGTH] = {0};
 char recv_buffer[MAX_RECV_LENGTH] = {0};
 struct _queue inqueue, outqueue;
 int sock;
-pthread_mutex_t outMutex, inMutex;   
-
+sem_t outsem, outsem2, insem, insem2; 
 //Shift an array using user provided parameters for intial position
 //in array as well as the amount to shift by.
 void array_shift(int* array, int shift, int init_val){
@@ -87,9 +86,9 @@ void *Send(void* ptr){
       gspace = queue_space(&outqueue, QUEUE_SPACE_GET);
       k = 0;
       if(gspace > 0){
-         //Wait until userWrite has written something
+         //Wait until user has put something on queue;
+         sem_wait(&outsem);
          while(k<MAX_MESSAGES){
-            pthread_mutex_lock(&outMutex);
             if(outbuffer[k] != 0){
                size = outbuffer[k];
                printf("Message size on buffer: %d\n", size);
@@ -98,11 +97,10 @@ void *Send(void* ptr){
                outbuffer[k] = 0;
                array_shift(outbuffer, (k+1), (k+1));
                k = MAX_MESSAGES;
-               //Allow userWrite to be called again
+               sem_post(&outsem2);
             }
             k++;
-            pthread_mutex_unlock(&outMutex);
-         }  
+         }
          //Send message
          sendto(sock, send_buffer, size, 0,
                (struct sockaddr*)&client_addr,sizeof(struct sockaddr)); 
@@ -127,20 +125,23 @@ void *Receive(void* ptr){
                       (struct sockaddr*)&server_addr,(socklen_t*) 
                       sizeof(struct sockaddr));
       recv_buffer[bytes] = '\0';
+      printf("bytes read: %d\n", (int)strlen(recv_buffer));
+      printf("Received Message: %s\n", recv_buffer);
       if(bytes > 0){
          pspace = queue_space(&inqueue, QUEUE_SPACE_PUT);
          plength = strlen(recv_buffer)+1;
          if(pspace >= plength){
-            pthread_mutex_lock(&inMutex);
+
             while(j < MAX_MESSAGES){
                if(inbuffer[j] == 0){
                   inbuffer[j] = plength;
                   queue_put(&inqueue, recv_buffer, plength);
                   j = MAX_MESSAGES;  
+                  sem_post(&insem2);
                }
                j++;
             }
-            pthread_mutex_unlock(&inMutex);
+
          }
          else{
             printf("Receive queue full, flushing queue\n");
@@ -163,15 +164,15 @@ int userWrite(char* message){
    int size = strlen(message)+1;
    int j = 0;
    if(pspace >= size){
+      sem_wait(&outsem2);
       while(j < MAX_MESSAGES){
-         pthread_mutex_lock(&outMutex);
          if(outbuffer[j] == 0){
             outbuffer[j] = size;
             queue_put(&outqueue, message, size);
             j = MAX_MESSAGES;
+            sem_post(&outsem);
          }
          j++;
-         pthread_mutex_unlock(&outMutex);
       }
       return size;
    }
@@ -195,7 +196,7 @@ int userRead(char* buffer){
    gspace = queue_space(&inqueue, QUEUE_SPACE_GET);
    
    if(gspace > 0){
-      pthread_mutex_lock(&inMutex);
+      sem_wait(&insem2);
       while(k<MAX_MESSAGES){
          if(inbuffer[k] != 0){
             queue_get(&inqueue, buffer, inbuffer[k]);
@@ -205,7 +206,7 @@ int userRead(char* buffer){
          }
          k++;
       }
-      pthread_mutex_unlock(&inMutex);
+
       return 1;
    }
    else{
@@ -218,11 +219,10 @@ void commInit(char* IPaddr, int dest_portnumber, int portno){
    pthread_t thread1, thread2;
    
    //Initialize Mutexs
-   pthread_mutexattr_t myMutexAttr;
-   pthread_mutexattr_init(&myMutexAttr);
-   pthread_mutexattr_setpshared(&myMutexAttr, PTHREAD_PROCESS_SHARED);
-   pthread_mutex_init(&outMutex, &myMutexAttr);
-   pthread_mutex_init(&inMutex, &myMutexAttr);
+   sem_init(&outsem, 0, 0);
+   sem_init(&outsem2, 0, 1);
+   sem_init(&insem, 0, 0);
+   sem_init(&insem2, 0, 1);
    
    //Initialize queues
    if(!queue_init(&inqueue, MAX_BUFFER_LENGTH) ||

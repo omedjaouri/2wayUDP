@@ -18,7 +18,7 @@
 #define MAX_RECV_LENGTH 512
 #define MAX_SEND_LENGTH 512
 #define MAX_BUFFER_LENGTH 4086
-#define MAX_MESSAGES 8
+#define MAX_MESSAGES 12
 
 
 /*

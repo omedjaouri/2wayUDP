@@ -3,7 +3,7 @@
 #include <stdio.h>
 
 char message[512] = {'0'};
-char test[] = "hello";
+char test[] = "i am very confused";
 
 int main(){
    int portno, portno_other, k;
