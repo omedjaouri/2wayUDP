@@ -14,6 +14,7 @@
 #include "udp_comms.h"
 #include "strings.h"
 #include "string.h"
+#include "semaphore.h"
 
 #define MAX_RECV_LENGTH 512
 #define MAX_SEND_LENGTH 512
@@ -27,6 +28,7 @@ char send_buffer[MAX_SEND_LENGTH] = {0};
 char recv_buffer[MAX_RECV_LENGTH] = {0};
 struct _queue inqueue, outqueue;
 int sock;
+pthread_mutex_t outMutex, inMutex;   
 
 //Shift an array using user provided parameters for intial position
 //in array as well as the amount to shift by.
@@ -81,23 +83,30 @@ void clientInit(int type, int portno, char* IPaddr){
 void *Send(void* ptr){
    int k, gspace, size;
    while(1){
-      k = 0;
       //Check for values in queue
       gspace = queue_space(&outqueue, QUEUE_SPACE_GET);
+      k = 0;
       if(gspace > 0){
+         //Wait until userWrite has written something
          while(k<MAX_MESSAGES){
+            pthread_mutex_lock(&outMutex);
             if(outbuffer[k] != 0){
                size = outbuffer[k];
+               printf("Message size on buffer: %d\n", size);
                queue_get(&outqueue, send_buffer, size);
+               printf("Message from buffer: %s\n", send_buffer);
                outbuffer[k] = 0;
                array_shift(outbuffer, (k+1), (k+1));
                k = MAX_MESSAGES;
+               //Allow userWrite to be called again
             }
             k++;
-         }
+            pthread_mutex_unlock(&outMutex);
+         }  
          //Send message
          sendto(sock, send_buffer, size, 0,
-            (struct sockaddr*)&client_addr,sizeof(struct sockaddr));
+               (struct sockaddr*)&client_addr,sizeof(struct sockaddr)); 
+         
       }
    }
 }
@@ -122,6 +131,7 @@ void *Receive(void* ptr){
          pspace = queue_space(&inqueue, QUEUE_SPACE_PUT);
          plength = strlen(recv_buffer)+1;
          if(pspace >= plength){
+            pthread_mutex_lock(&inMutex);
             while(j < MAX_MESSAGES){
                if(inbuffer[j] == 0){
                   inbuffer[j] = plength;
@@ -130,6 +140,7 @@ void *Receive(void* ptr){
                }
                j++;
             }
+            pthread_mutex_unlock(&inMutex);
          }
          else{
             printf("Receive queue full, flushing queue\n");
@@ -153,12 +164,14 @@ int userWrite(char* message){
    int j = 0;
    if(pspace >= size){
       while(j < MAX_MESSAGES){
+         pthread_mutex_lock(&outMutex);
          if(outbuffer[j] == 0){
             outbuffer[j] = size;
             queue_put(&outqueue, message, size);
             j = MAX_MESSAGES;
          }
          j++;
+         pthread_mutex_unlock(&outMutex);
       }
       return size;
    }
@@ -182,6 +195,7 @@ int userRead(char* buffer){
    gspace = queue_space(&inqueue, QUEUE_SPACE_GET);
    
    if(gspace > 0){
+      pthread_mutex_lock(&inMutex);
       while(k<MAX_MESSAGES){
          if(inbuffer[k] != 0){
             queue_get(&inqueue, buffer, inbuffer[k]);
@@ -191,6 +205,7 @@ int userRead(char* buffer){
          }
          k++;
       }
+      pthread_mutex_unlock(&inMutex);
       return 1;
    }
    else{
@@ -201,7 +216,14 @@ int userRead(char* buffer){
 void commInit(char* IPaddr, int dest_portnumber, int portno){
    int threadret1, threadret2;
    pthread_t thread1, thread2;
-
+   
+   //Initialize Mutexs
+   pthread_mutexattr_t myMutexAttr;
+   pthread_mutexattr_init(&myMutexAttr);
+   pthread_mutexattr_setpshared(&myMutexAttr, PTHREAD_PROCESS_SHARED);
+   pthread_mutex_init(&outMutex, &myMutexAttr);
+   pthread_mutex_init(&inMutex, &myMutexAttr);
+   
    //Initialize queues
    if(!queue_init(&inqueue, MAX_BUFFER_LENGTH) ||
       !queue_init(&outqueue, MAX_BUFFER_LENGTH)){

@@ -6,7 +6,7 @@ char message[512] = {'0'};
 char test[] = "hello";
 
 int main(){
-   int portno, portno_other;
+   int portno, portno_other, k;
    bool check;   
 
    printf("Destination Port Number: ");
@@ -15,19 +15,17 @@ int main(){
    printf("Your Port Number: ");
    scanf("%d", &portno);
    
-   communicationInit("127.0.0.1", portno_other, portno, 1000000);
+   commInit("127.0.0.1", portno_other, portno);
    
-   while(1){
+   k = 0;
+   while(k<10){
       check = userWrite(test);
       if(check == -1)
-         printf("Unable to put on queue\n");
-      else
-         printf("Message put on queue\n");
-      
-      printf("Transmit: \n");
-      scanf("%s", message);
-      printf("Sending: %s\n", message);
-         
+         printf("Unable to put on queue\n"); 
+      //printf("Transmit: \n");
+      //scanf("%s", message);
+      //printf("Sending: %s\n", message);
+      /*   
       if(message == "quit"){
          printf("Program ending\n");
          kill(pID, SIGTERM);
@@ -43,6 +41,10 @@ int main(){
             printf("Send Success\n");
          }
       }
+   }*/
+      k++;
+   }
+   while(1){
    }
    return 0;
 }  
